@@ -28,7 +28,13 @@ class URLShortenerTests(unittest.TestCase):
 
     def test_rejects_invalid_urls(self):
         shortener = URLShortener()
-        for url in ("", "example.com", "ftp://example.com", "https:///missing-host"):
+        for url in (
+            "",
+            "example.com",
+            "ftp://example.com",
+            "https:///missing-host",
+            "https://example.com/\r\nX-Injected: yes",
+        ):
             with self.subTest(url=url):
                 with self.assertRaises(ValueError):
                     shortener.shorten(url)

@@ -17,6 +17,8 @@ class URLShortener:
         if not isinstance(url, str):
             raise TypeError("url must be a string")
         normalized = url.strip()
+        if any(ord(character) < 32 or ord(character) == 127 for character in normalized):
+            raise ValueError("URL must not contain control characters")
         try:
             parsed = urlsplit(normalized)
             host = parsed.hostname
@@ -53,6 +55,20 @@ class URLShortener:
 
     def items(self):
         return self._url_by_code.items()
+
+    def table_layout(self) -> list[tuple[int, list[tuple[str, str, list[tuple[str, int]]]]]]:
+        layout = []
+        for index, entries in enumerate(self._url_by_code.bucket_entries()):
+            details = [
+                (code, url, self._url_by_code.hash_trace(code))
+                for code, url in entries
+            ]
+            layout.append((index, details))
+        return layout
+
+    @property
+    def table_capacity(self) -> int:
+        return self._url_by_code.capacity
 
     def __len__(self) -> int:
         return len(self._url_by_code)
