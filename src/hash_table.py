@@ -6,6 +6,19 @@ from typing import Generic, Iterator, TypeVar
 Value = TypeVar("Value")
 
 
+def polynomial_hash_trace(key: str, capacity: int) -> list[tuple[str, int]]:
+    if not isinstance(key, str):
+        raise TypeError("key must be a string")
+    if capacity < 1:
+        raise ValueError("capacity must be positive")
+    value = 0
+    trace = []
+    for character in key:
+        value = (value * 31 + ord(character)) % capacity
+        trace.append((character, value))
+    return trace
+
+
 class _Node(Generic[Value]):
     def __init__(self, key: str, value: Value, next_node: "_Node[Value] | None" = None):
         self.key = key
@@ -31,14 +44,7 @@ class HashTable(Generic[Value]):
     def hash_trace(self, key: str, capacity: int | None = None) -> list[tuple[str, int]]:
         self._validate_key(key)
         modulus = self.capacity if capacity is None else capacity
-        if modulus < 1:
-            raise ValueError("capacity must be positive")
-        value = 0
-        trace = []
-        for character in key:
-            value = (value * 31 + ord(character)) % modulus
-            trace.append((character, value))
-        return trace
+        return polynomial_hash_trace(key, modulus)
 
     def hash_index(self, key: str, capacity: int | None = None) -> int:
         trace = self.hash_trace(key, capacity)
@@ -128,6 +134,18 @@ class HashTable(Generic[Value]):
             while node is not None:
                 yield node.key, node.value
                 node = node.next
+
+    def lookup_trace(self, key: str) -> list[int]:
+        self._validate_key(key)
+        index = self.hash_index(key)
+        inspected = []
+        node = self._buckets[index]
+        while node is not None:
+            inspected.append(index)
+            if node.key == key:
+                break
+            node = node.next
+        return inspected
 
     def bucket_entries(self) -> list[list[tuple[str, Value]]]:
         buckets = []

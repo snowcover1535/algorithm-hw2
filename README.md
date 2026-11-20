@@ -19,13 +19,15 @@
 
 | 파일 | 하는 일 |
 | --- | --- |
-| `SPEC.md` | 명세 틀. 에이전트가 초안을 쓰고 **본인이 고칩니다** |
-| `src/` · `tests/` · `experiments/` | 비어 있습니다. 수업에서 채웁니다 |
+| `SPEC.md` | URL 단축기와 두 해시 테이블의 동작 명세 |
+| `PLAN.md` | 구현 순서와 검증 계획 |
+| `src/` | base62, 해시 테이블, URL 단축기, 웹 서버 |
+| `tests/` | 두 구현과 서버의 경계 사례 테스트 |
+| `experiments/` | 탐색 비용 CSV, SVG 그래프, PDF 보고서 |
 | `tools/catchup.sh` | 수업 중 놓친 단계를 따라잡는 스크립트 |
-| `Makefile` | `make test` · `make serve` · `make experiment` |
+| `Makefile` | `make test` · `make serve` · `make experiment` · `make compare-experiment` |
 
-정답 코드는 들어 있지 않습니다. 에이전트는 작업 공간의 파일을 읽으므로, 정답이
-옆에 있으면 그대로 베껴 와서 연습이 되지 않습니다.
+현재 저장소에는 과제 1–8단계의 구현과 실험 결과가 포함되어 있습니다.
 
 ## 명령
 
@@ -35,11 +37,14 @@
 | --- | --- |
 | 테스트 | `make test` |
 | 웹 서버 (포트 8000) | `make serve` |
-| 충돌 실험 | `make experiment` |
-| 놓친 단계 따라잡기 | `sh tools/catchup.sh <단계 번호>` |
+| 체이닝 적재율 실험 | `make experiment` |
+| 두 테이블 비교 실험 | `make compare-experiment` |
+| 놓친 단계 따라잡기 (1–8) | `sh tools/catchup.sh <단계 번호>` |
 
 외부 라이브러리는 쓰지 않습니다. Python 표준 모듈만으로 충분합니다.
 서버에서 `/table`을 열면 저장된 해시 테이블과 다항식 해시 계산 과정을 볼 수 있습니다.
+`make compare-experiment`는 두 충돌 처리 방식의 탐색 비용 표, SVG 그래프, 1쪽 PDF 보고서를
+`experiments/`에 생성합니다.
 
 ## 적재율 실험
 
@@ -48,6 +53,11 @@
 `experiments/probe_results.csv`, 그래프는 `experiments/probe_results.svg`에 생성됩니다.
 성공 탐색은 유한한 무작위 키 집합의 버킷 분포 때문에 이론값과 조금 다를 수 있으며,
 실패 탐색은 모든 버킷을 한 번씩 확인해 평균하므로 이 실험에서 이론값과 일치합니다.
+
+`make compare-experiment`는 같은 키 집합을 별도 체이닝과 선형 탐지에 넣고 적재율
+0.1–0.9의 성공/실패 탐색 비용을 비교합니다. 결과는
+`experiments/table_comparison.csv`, `experiments/table_comparison.svg`, 그리고
+최대 2쪽인 `experiments/table_comparison.pdf`에 저장됩니다.
 
 ## 로컬에서 하기
 

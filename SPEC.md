@@ -31,6 +31,11 @@ and entries are rehashed. String keys use the polynomial accumulator
 value or raises `KeyError`; and `len(table)` returns the number of entries.
 Non-string keys raise `TypeError`.
 
+`src/linear_probing.py` provides `LinearProbingHashTable` with the same mapping
+interface and polynomial hash. Collisions advance one slot at a time with wraparound;
+deletions use tombstones, and a full table doubles before accepting another entry.
+`URLShortener(table_type="chaining" | "linear")` selects either implementation.
+
 ## 4. URL shortener
 
 `src/shortener.py` provides `URLShortener` with `shorten(url) -> code` and
@@ -45,8 +50,8 @@ base62; hash values are never used as codes. Unknown or invalid codes raise
 
 `src/server.py` listens on port 8000 by default. `/` displays a URL input form;
 submitting it displays the short link and original URL. `/<code>` redirects to the
-original URL. `/table` displays stored mappings, separate-chaining buckets, and
-the polynomial-hash calculation for each key. Unknown codes return 404 and invalid
+original URL. `/table` displays stored mappings, the selected table's buckets or probe slots,
+and the polynomial-hash calculation and visited cells for each key. Unknown codes return 404 and invalid
 form input returns 400.
 
 ## 6. Boundary cases
