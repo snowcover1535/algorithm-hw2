@@ -10,8 +10,8 @@ set -e
 
 step="$1"
 case "$step" in
-  [1-7]) ;;
-  *) echo "사용법: sh tools/catchup.sh <단계 번호 1~7>"; exit 1 ;;
+  [1-8]) ;;
+  *) echo "사용법: sh tools/catchup.sh <단계 번호 1~8>"; exit 1 ;;
 esac
 
 if [ -n "$(git status --porcelain)" ]; then

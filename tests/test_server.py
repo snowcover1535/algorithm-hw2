@@ -4,6 +4,7 @@ import unittest
 from urllib.parse import urlencode
 
 from src.server import create_server
+from src.shortener import URLShortener
 
 
 class ServerTests(unittest.TestCase):
@@ -62,10 +63,19 @@ class ServerTests(unittest.TestCase):
         self.post_url("https://example.com/table")
         status, _headers, body = self.request("GET", "/table")
         self.assertEqual(status, 200)
-        self.assertIn("Separate-chaining table", body)
+        self.assertIn("Separate chaining table", body)
         self.assertIn("Bucket 0", body)
         self.assertIn("hash:", body)
         self.assertIn("% 8 =", body)
+
+    def test_table_shows_linear_probe_cells(self):
+        self.server.shortener = URLShortener(table_type="linear")
+        self.post_url("https://example.com/linear")
+        self.post_url("https://example.org/linear")
+        status, _headers, body = self.request("GET", "/table")
+        self.assertEqual(status, 200)
+        self.assertIn("Linear probing table", body)
+        self.assertIn("cells inspected:", body)
 
 
 if __name__ == "__main__":

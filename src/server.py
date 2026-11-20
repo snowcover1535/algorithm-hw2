@@ -98,8 +98,13 @@ class ShortenerHandler(BaseHTTPRequestHandler):
         )
 
     def _send_table(self) -> None:
+        strategy = (
+            "Separate chaining"
+            if self.server.shortener.table_type == "chaining"
+            else "Linear probing"
+        )
         rows = [
-            f'<h1>Separate-chaining table ({len(self.server.shortener)} entries, '
+            f'<h1>{strategy} table ({len(self.server.shortener)} entries, '
             f'{self.server.shortener.table_capacity} buckets)</h1>'
         ]
         for bucket_index, entries in self.server.shortener.table_layout():
@@ -108,7 +113,7 @@ class ShortenerHandler(BaseHTTPRequestHandler):
                 rows.append("<p>empty</p>")
                 continue
             rows.append("<ol>")
-            for code, url, trace in entries:
+            for code, url, trace, lookup_trace in entries:
                 previous = 0
                 steps = []
                 for character, value in trace:
@@ -118,10 +123,16 @@ class ShortenerHandler(BaseHTTPRequestHandler):
                     )
                     previous = value
                 calculation = " ; ".join(steps) or "empty string"
+                inspected_label = (
+                    "cells inspected"
+                    if self.server.shortener.table_type == "linear"
+                    else "nodes examined"
+                )
                 rows.append(
                     f"<li><code>{html.escape(code)}</code>: "
                     f"{html.escape(url)}; hash: {calculation}; "
-                    f"bucket: {bucket_index}</li>"
+                    f"bucket: {bucket_index}; {inspected_label}: "
+                    f"{' -> '.join(str(slot) for slot in lookup_trace)}</li>"
                 )
             rows.append("</ol>")
         self._send_html(

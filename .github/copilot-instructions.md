@@ -6,6 +6,8 @@
 - Implement hash tables without Python `dict`, `set`, or built-in `hash()`.
 - Preserve one public mapping interface across the separate-chaining and
   linear-probing implementations.
+- When comparing table strategies, use identical keys for both and state the
+  theoretical successful and unsuccessful probe formulas.
 - Generate short codes from monotonically increasing IDs encoded as base62.
   Never use a hash value as a short code.
 - Add or update focused tests before implementation, and do not weaken tests to
