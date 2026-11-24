@@ -27,12 +27,15 @@ class _Node(Generic[Value]):
 
 
 class HashTable(Generic[Value]):
-    def __init__(self, capacity: int = 8):
+    def __init__(self, capacity: int = 8, *, max_load: float | None = 0.75):
         if isinstance(capacity, bool) or not isinstance(capacity, int):
             raise TypeError("capacity must be an integer")
         if capacity < 1:
             raise ValueError("capacity must be positive")
+        if max_load is not None and not 0 < max_load <= 1:
+            raise ValueError("max_load must be in (0, 1] or None")
         self.capacity = capacity
+        self._max_load = max_load
         self._buckets: list[_Node[Value] | None] = [None] * capacity
         self._size = 0
 
@@ -77,7 +80,7 @@ class HashTable(Generic[Value]):
                 node = node.next
             node.next = new_node
         self._size += 1
-        if self._size / self.capacity > 0.75:
+        if self._max_load is not None and self._size / self.capacity > self._max_load:
             self._resize(self.capacity * 2)
 
     def get(self, key: str) -> Value:

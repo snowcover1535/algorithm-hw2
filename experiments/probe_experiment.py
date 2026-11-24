@@ -2,19 +2,34 @@
 
 import csv
 import random
-import sys
+from datetime import datetime
 from pathlib import Path
+from time import perf_counter
+
+from src.hash_table import HashTable
 
 
-CAPACITY = 2048
+CAPACITY = 4093
+MISS_COUNT = 2000
 LOAD_FACTORS = tuple(step / 4 for step in range(1, 17))
 
 
-def polynomial_hash(key: str, capacity: int) -> int:
-    value = 0
-    for character in key:
-        value = (value * 31 + ord(character)) % capacity
-    return value
+def random_urls(generator: random.Random, count: int, kind: str) -> list[str]:
+    tokens = generator.sample(range(2**62), count)
+    return [f"https://example.com/{kind}/{token:x}" for token in tokens]
+
+
+def average_probes(table, keys: list[str]) -> float:
+    return sum(len(table.lookup_trace(key)) for key in keys) / len(keys) if keys else 0.0
+
+
+def log_progress(completed: int, total: int, message: str, started: float) -> None:
+    timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
+    print(
+        f"[{timestamp}] [{100 * completed / total:3.0f}%] "
+        f"{message} ({perf_counter() - started:.2f}s)",
+        flush=True,
+    )
 
 
 def measure_probes(capacity: int, item_count: int, seed: int = 2026) -> tuple[float, float]:
@@ -24,42 +39,32 @@ def measure_probes(capacity: int, item_count: int, seed: int = 2026) -> tuple[fl
         raise ValueError("item_count must be non-negative")
 
     generator = random.Random(seed)
-    buckets: list[list[str]] = [[] for _ in range(capacity)]
-    keys = []
-    seen = set()
-    while len(keys) < item_count:
-        key = f"url-{generator.getrandbits(64):016x}"
-        if key not in seen:
-            seen.add(key)
-            keys.append(key)
-
-    successful_probes = 0
-    for key in keys:
-        bucket = buckets[polynomial_hash(key, capacity)]
-        successful_probes += len(bucket) + 1
-        bucket.append(key)
-
-    average_success = successful_probes / item_count if item_count else 0.0
-    average_failure = sum(map(len, buckets)) / capacity
-    return average_success, average_failure
+    keys = random_urls(generator, item_count, "hit")
+    missing = random_urls(generator, MISS_COUNT, "miss")
+    table = HashTable(capacity=capacity, max_load=None)
+    for index, key in enumerate(keys):
+        table.set(key, index)
+    return average_probes(table, keys), average_probes(table, missing)
 
 
-def experiment_rows(capacity: int = CAPACITY) -> list[dict[str, float]]:
+def experiment_rows(capacity: int = CAPACITY, *, on_progress=None) -> list[dict[str, float]]:
     rows = []
-    for load_factor in LOAD_FACTORS:
+    for index, load_factor in enumerate(LOAD_FACTORS, start=1):
+        started = perf_counter()
         item_count = round(capacity * load_factor)
-        successful, unsuccessful = measure_probes(
-            capacity, item_count, seed=2026 + item_count
-        )
+        successful, unsuccessful = measure_probes(capacity, item_count, seed=2026 + item_count)
+        actual_load = item_count / capacity
         rows.append(
             {
                 "load_factor": load_factor,
                 "successful_measured": successful,
-                "successful_theory": 1 + load_factor / 2,
+                "successful_theory": 1 + actual_load / 2,
                 "unsuccessful_measured": unsuccessful,
-                "unsuccessful_theory": load_factor,
+                "unsuccessful_theory": actual_load,
             }
         )
+        if on_progress is not None:
+            on_progress(index, len(LOAD_FACTORS) + 1, f"Measured chaining at alpha={load_factor:.2f}", started)
     return rows
 
 
@@ -142,9 +147,12 @@ def write_svg(rows: list[dict[str, float]], path: Path) -> None:
 
 def main() -> None:
     output_dir = Path(__file__).parent
-    rows = experiment_rows()
-    csv_path = output_dir / "probe_results.csv"
-    svg_path = output_dir / "probe_results.svg"
+    total = len(LOAD_FACTORS) + 1
+    log_progress(0, total, f"Starting fixed-capacity chaining experiment (M={CAPACITY})", perf_counter())
+    rows = experiment_rows(on_progress=log_progress)
+    started = perf_counter()
+    csv_path = output_dir / "results.csv"
+    svg_path = output_dir / "results.svg"
     write_csv(rows, csv_path)
     write_svg(rows, svg_path)
     print("alpha  successful (measured/theory)  unsuccessful (measured/theory)")
@@ -154,7 +162,7 @@ def main() -> None:
             f'{row["successful_measured"]:6.3f}/{row["successful_theory"]:6.3f}   '
             f'{row["unsuccessful_measured"]:6.3f}/{row["unsuccessful_theory"]:6.3f}'
         )
-    print(f"Wrote {csv_path} and {svg_path}")
+    log_progress(total, total, f"Wrote {csv_path.name} and {svg_path.name}", started)
 
 
 if __name__ == "__main__":

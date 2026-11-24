@@ -23,7 +23,7 @@
 | `PLAN.md` | 구현 순서와 검증 계획 |
 | `src/` | base62, 해시 테이블, URL 단축기, 웹 서버 |
 | `tests/` | 두 구현과 서버의 경계 사례 테스트 |
-| `experiments/` | 탐색 비용 CSV, SVG 그래프, PDF 보고서 |
+| `experiments/` | 탐색 비용 CSV, SVG 그래프, 비교 그림 PDF |
 | `tools/catchup.sh` | 수업 중 놓친 단계를 따라잡는 스크립트 |
 | `Makefile` | `make test` · `make serve` · `make experiment` · `make compare-experiment` |
 
@@ -36,28 +36,29 @@
 | 하고 싶은 것 | 명령 |
 | --- | --- |
 | 테스트 | `make test` |
-| 웹 서버 (포트 8000) | `make serve` |
+| 웹 서버 (포트 8000, 개별 체이닝) | `make serve` |
+| 웹 서버 (포트 8000, 선형 탐지) | `make serve TABLE=linear` |
 | 체이닝 적재율 실험 | `make experiment` |
 | 두 테이블 비교 실험 | `make compare-experiment` |
 | 놓친 단계 따라잡기 (1–8) | `sh tools/catchup.sh <단계 번호>` |
 
 외부 라이브러리는 쓰지 않습니다. Python 표준 모듈만으로 충분합니다.
-서버에서 `/table`을 열면 저장된 해시 테이블과 다항식 해시 계산 과정을 볼 수 있습니다.
-`make compare-experiment`는 두 충돌 처리 방식의 탐색 비용 표, SVG 그래프, 1쪽 PDF 보고서를
-`experiments/`에 생성합니다.
+서버에서 `/table`을 열면 URL→코드 테이블과 호너 해시 계산 과정을 볼 수 있습니다.
+개별 체이닝 화면은 노드를 화살표로 잇고, 선형 탐지 화면은 탐색 중 살펴본 슬롯을 표시합니다.
+Codespaces 프록시가 전달한 호스트와 프로토콜이 유효하면 결과에 복사 가능한 전체 단축 주소를 표시합니다.
 
 ## 적재율 실험
 
 `make experiment`는 별도 체이닝에서 적재율 0.25–4.00의 성공/실패 탐색 노드 수를
 측정하고 이론값(`성공 1 + α/2`, `실패 α`)과 비교합니다. 결과 표는
-`experiments/probe_results.csv`, 그래프는 `experiments/probe_results.svg`에 생성됩니다.
-성공 탐색은 유한한 무작위 키 집합의 버킷 분포 때문에 이론값과 조금 다를 수 있으며,
-실패 탐색은 모든 버킷을 한 번씩 확인해 평균하므로 이 실험에서 이론값과 일치합니다.
+`experiments/results.csv`, 그래프는 `experiments/results.svg`에 생성됩니다.
+칸 수를 4093으로 고정한 실제 `HashTable`을 사용합니다. 삽입한 모든 URL과 별도로
+생성한 미삽입 URL 2,000개의 탐색 경로에서 실제 비교 노드 수를 셉니다.
 
-`make compare-experiment`는 같은 키 집합을 별도 체이닝과 선형 탐지에 넣고 적재율
-0.1–0.9의 성공/실패 탐색 비용을 비교합니다. 결과는
-`experiments/table_comparison.csv`, `experiments/table_comparison.svg`, 그리고
-최대 2쪽인 `experiments/table_comparison.pdf`에 저장됩니다.
+`make compare-experiment`는 두 구현에 같은 삽입 URL과 미삽입 URL을 사용합니다.
+칸 수 4093, 적재율 0.1–0.9, 시드 2026으로 5회 반복한 평균을 이론과 비교합니다.
+결과는 `experiments/table_comparison.csv`, `experiments/table_comparison.svg`,
+그리고 비교 그림 한 쪽을 담은 `experiments/table_comparison.pdf`에 저장됩니다.
 
 ## 로컬에서 하기
 

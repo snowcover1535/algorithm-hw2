@@ -68,22 +68,22 @@ class URLShortener:
         self,
     ) -> list[tuple[int, list[tuple[str, str, list[tuple[str, int]], list[int]]]]]:
         layout = []
-        for index, entries in enumerate(self._url_by_code.bucket_entries()):
+        for index, entries in enumerate(self._code_by_url.bucket_entries()):
             details = [
                 (
                     code,
                     url,
-                    self._url_by_code.hash_trace(code),
-                    self._url_by_code.lookup_trace(code),
+                    self._code_by_url.hash_trace(url),
+                    self._code_by_url.lookup_trace(url),
                 )
-                for code, url in entries
+                for url, code in entries
             ]
             layout.append((index, details))
         return layout
 
     @property
     def table_capacity(self) -> int:
-        return self._url_by_code.capacity
+        return self._code_by_url.capacity
 
     def __len__(self) -> int:
         return len(self._url_by_code)

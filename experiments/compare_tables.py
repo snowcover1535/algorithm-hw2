@@ -1,10 +1,18 @@
 """Compare separate chaining and linear probing on identical key sets."""
 
 import csv
+from math import ceil
 import random
 from pathlib import Path
+from time import perf_counter
+
+from experiments.probe_experiment import CAPACITY, MISS_COUNT, average_probes, log_progress, random_urls
+from src.hash_table import HashTable
+from src.linear_probing import LinearProbingHashTable
 
 
+TRIALS = 5
+REPOSITORY_URL = "https://github.com/snowcover1535/algorithm-hw2"
 LOAD_FACTORS = tuple(step / 10 for step in range(1, 10))
 FIELDS = (
     "load_factor",
@@ -19,82 +27,58 @@ FIELDS = (
 )
 
 
-def polynomial_hash(key: str, capacity: int) -> int:
-    value = 0
-    for character in key:
-        value = (value * 31 + ord(character)) % capacity
-    return value
+def measure_key_set(keys: list[str], capacity: int, missing: list[str]) -> tuple[float, float, float, float]:
+    chaining = HashTable(capacity=capacity, max_load=None)
+    linear = LinearProbingHashTable(capacity=capacity)
+    for index, key in enumerate(keys):
+        chaining.set(key, index)
+        linear.set(key, index)
+
+    return (
+        average_probes(chaining, keys),
+        average_probes(chaining, missing),
+        average_probes(linear, keys),
+        average_probes(linear, missing),
+    )
 
 
-def measure_key_set(keys: list[str], capacity: int) -> tuple[float, float, float, float]:
-    chain_buckets: list[list[str]] = [[] for _ in range(capacity)]
-    linear_slots: list[str | None] = [None] * capacity
-
-    for key in keys:
-        chain_buckets[polynomial_hash(key, capacity)].append(key)
-        index = polynomial_hash(key, capacity)
-        while linear_slots[index] is not None:
-            index = (index + 1) % capacity
-        linear_slots[index] = key
-
-    chain_success = sum(
-        chain_buckets[polynomial_hash(key, capacity)].index(key) + 1
-        for key in keys
-    ) / len(keys)
-    chain_failure = sum(map(len, chain_buckets)) / capacity
-
-    linear_success_total = 0
-    for key in keys:
-        index = polynomial_hash(key, capacity)
-        probes = 1
-        while linear_slots[index] != key:
-            index = (index + 1) % capacity
-            probes += 1
-        linear_success_total += probes
-    linear_success = linear_success_total / len(keys)
-
-    linear_failure_total = 0
-    for start in range(capacity):
-        index = start
-        probes = 1
-        while linear_slots[index] is not None:
-            index = (index + 1) % capacity
-            probes += 1
-        linear_failure_total += probes
-    linear_failure = linear_failure_total / capacity
-    return chain_success, chain_failure, linear_success, linear_failure
-
-
-def experiment_rows(capacity: int = 2048, seed: int = 2026) -> list[dict[str, float]]:
+def experiment_rows(
+    capacity: int = CAPACITY, seed: int = 2026, *, trials: int = TRIALS, on_progress=None
+) -> list[dict[str, float]]:
     if capacity < 10:
         raise ValueError("capacity must be at least 10")
+    if trials < 1:
+        raise ValueError("trials must be positive")
+    totals = [[] for _ in LOAD_FACTORS]
     generator = random.Random(seed)
     max_count = round(capacity * LOAD_FACTORS[-1])
-    keys = []
-    seen = set()
-    while len(keys) < max_count:
-        key = f"url-{generator.getrandbits(64):016x}"
-        if key not in seen:
-            seen.add(key)
-            keys.append(key)
+    for trial in range(1, trials + 1):
+        started = perf_counter()
+        keys = random_urls(generator, max_count, "hit")
+        missing = random_urls(generator, MISS_COUNT, "miss")
+        for load_factor, results in zip(LOAD_FACTORS, totals):
+            count = round(capacity * load_factor)
+            results.append(measure_key_set(keys[:count], capacity, missing))
+        if on_progress is not None:
+            on_progress(trial, trials + 1, f"Measured comparison trial {trial}/{trials}", started)
 
     rows = []
-    for load_factor in LOAD_FACTORS:
-        item_count = round(capacity * load_factor)
-        chain_success, chain_failure, linear_success, linear_failure = measure_key_set(
-            keys[:item_count], capacity
+    for load_factor, results in zip(LOAD_FACTORS, totals):
+        actual_load = round(capacity * load_factor) / capacity
+        chain_hit, chain_miss, linear_hit, linear_miss = (
+            sum(column) / trials for column in zip(*results)
         )
         rows.append(
             {
                 "load_factor": load_factor,
-                "chaining_success_measured": chain_success,
-                "chaining_success_theory": 1 + load_factor / 2,
-                "chaining_failure_measured": chain_failure,
-                "chaining_failure_theory": load_factor,
-                "linear_success_measured": linear_success,
-                "linear_success_theory": 0.5 * (1 + 1 / (1 - load_factor)),
-                "linear_failure_measured": linear_failure,
-                "linear_failure_theory": 0.5 * (1 + 1 / (1 - load_factor) ** 2),
+                "chaining_success_measured": chain_hit,
+                "chaining_success_theory": 1 + actual_load / 2,
+                "chaining_failure_measured": chain_miss,
+                "chaining_failure_theory": actual_load,
+                "linear_success_measured": linear_hit,
+                "linear_success_theory": 0.5 * (1 + 1 / (1 - actual_load)),
+                "linear_failure_measured": linear_miss,
+                "linear_failure_theory": 0.5 * (1 + 1 / (1 - actual_load) ** 2),
             }
         )
     return rows
@@ -109,13 +93,20 @@ def write_csv(rows: list[dict[str, float]], path: Path) -> None:
         )
 
 
+def chart_limits(rows: list[dict[str, float]]) -> tuple[int, int]:
+    success = max(max(row["linear_success_measured"], row["linear_success_theory"]) for row in rows)
+    failure = max(max(row["linear_failure_measured"], row["linear_failure_theory"]) for row in rows)
+    return ceil(success), 10 * ceil(failure / 10)
+
+
 def write_svg(rows: list[dict[str, float]], path: Path) -> None:
     width, height = 820, 690
     left, right = 75, 30
     chart_width = width - left - right
+    success_top, failure_top = chart_limits(rows)
     panels = (
-        (55, 265, "Successful search", 7.0, "success"),
-        (385, 265, "Unsuccessful search", 60.0, "failure"),
+        (55, 265, "Successful search", success_top, "success"),
+        (385, 265, "Unsuccessful search", failure_top, "failure"),
     )
     colors = {"chaining": "#1769aa", "linear": "#d1495b"}
     lines = [
@@ -131,6 +122,10 @@ def write_svg(rows: list[dict[str, float]], path: Path) -> None:
         plot_bottom = panel_y + panel_height
         lines.append(
             f'<text x="{left + chart_width/2:.1f}" y="{plot_top-12}" text-anchor="middle">{title}</text>'
+        )
+        lines.append(
+            f'<text transform="translate(16 {plot_top+panel_height/2:.1f}) rotate(-90)" '
+            'text-anchor="middle">Average nodes / slots inspected</text>'
         )
 
         def point(load: float, probes: float) -> tuple[float, float]:
@@ -268,11 +263,14 @@ class _PDFPage:
                 self.line(*first, *second, color=color, dashed=dashed, width=1.2)
 
 
-def write_pdf(rows: list[dict[str, float]], path: Path) -> None:
+def write_pdf(
+    rows: list[dict[str, float]], path: Path, *, capacity: int = CAPACITY, trials: int = TRIALS
+) -> None:
     page = _PDFPage()
-    page.text(42, 806, "Hash table comparison: separate chaining vs linear probing", 15)
-    page.text(42, 788, "Same deterministic URL-like keys; capacity 2048; load factors 0.1 to 0.9.", 8)
-    page.text(42, 774, "Measured probes are compared with standard expected-probe formulas.", 8)
+    page.text(42, 823, REPOSITORY_URL, 9)
+    page.text(42, 806, "Hash table comparison figures", 15)
+    page.text(42, 788, f"M={capacity}; {trials} trials; {MISS_COUNT} missing URLs per trial; seed=2026.", 8)
+    page.text(42, 774, "Both implementations receive the same inputs at load factors 0.1 to 0.9.", 8)
 
     last = rows[-1]
     page.text(42, 750, "At alpha=0.9 (measured / theory):", 9)
@@ -305,13 +303,13 @@ def write_pdf(rows: list[dict[str, float]], path: Path) -> None:
         )
 
     page.text(48, 575, "Successful search (solid = measured, dashed = theory)", 8)
-    page.chart(rows, 42, 390, 250, 175, "success", 7)
+    success_top, failure_top = chart_limits(rows)
+    page.chart(rows, 42, 390, 250, 175, "success", success_top)
     page.text(325, 575, "Unsuccessful search (solid = measured, dashed = theory)", 8)
-    page.chart(rows, 315, 390, 250, 175, "failure", 60)
+    page.chart(rows, 315, 390, 250, 175, "failure", failure_top)
     page.text(42, 365, "Blue: chaining; red: linear probing. Both methods use identical keys per load factor.", 8)
-    page.text(42, 347, "Chaining follows 1+alpha/2 (hit) and alpha (miss) closely.", 8)
-    page.text(42, 333, "Linear probing cost rises sharply near full tables due to primary clustering.", 8)
-    page.text(42, 319, "Finite deterministic samples and the polynomial hash explain small theory deviations.", 8)
+    page.text(42, 347, "Units: nodes compared for chaining; slots inspected for linear probing.", 8)
+    page.text(42, 333, "Successful searches cover every inserted key. Misses use a separate URL pool.", 8)
     page.text(42, 296, "Full measurements: experiments/table_comparison.csv; graph: table_comparison.svg.", 7)
 
     stream = ("\n".join(page.operations) + "\n").encode("ascii")
@@ -346,7 +344,9 @@ def write_pdf(rows: list[dict[str, float]], path: Path) -> None:
 
 def main() -> None:
     output_dir = Path(__file__).parent
-    rows = experiment_rows()
+    log_progress(0, TRIALS + 1, f"Starting comparison (M={CAPACITY}, {TRIALS} trials)", perf_counter())
+    rows = experiment_rows(on_progress=log_progress)
+    started = perf_counter()
     csv_path = output_dir / "table_comparison.csv"
     svg_path = output_dir / "table_comparison.svg"
     pdf_path = output_dir / "table_comparison.pdf"
@@ -360,7 +360,7 @@ def main() -> None:
             f'{row["chaining_success_measured"]:.3f}/{row["chaining_failure_measured"]:.3f}    '
             f'{row["linear_success_measured"]:.3f}/{row["linear_failure_measured"]:.3f}'
         )
-    print(f"Wrote {csv_path}, {svg_path}, and {pdf_path}")
+    log_progress(TRIALS + 1, TRIALS + 1, f"Wrote {csv_path.name}, {svg_path.name}, and {pdf_path.name}", started)
 
 
 if __name__ == "__main__":

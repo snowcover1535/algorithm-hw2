@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from experiments.compare_tables import experiment_rows, write_csv, write_pdf, write_svg
+from experiments.compare_tables import experiment_rows, measure_key_set, write_csv, write_pdf, write_svg
 
 
 class TableComparisonExperimentTests(unittest.TestCase):
@@ -15,6 +15,9 @@ class TableComparisonExperimentTests(unittest.TestCase):
             with self.subTest(load_factor=row["load_factor"]):
                 self.assertGreaterEqual(row["linear_failure_measured"], 1.0)
                 self.assertGreaterEqual(row["chaining_success_measured"], 1.0)
+
+    def test_counts_actual_collision_and_empty_slot(self):
+        self.assertEqual(measure_key_set(["g", "o"], 8, ["w", "b"]), (1.5, 1.0, 1.5, 2.0))
 
     def test_writes_comparison_table_graph_and_single_page_pdf(self):
         rows = experiment_rows(capacity=100)

@@ -9,6 +9,7 @@
 # 외부 라이브러리를 쓰지 않는다. Python 표준 모듈만으로 돈다.
 
 PORT ?= 8000
+TABLE ?= chaining
 
 .PHONY: all test serve experiment compare-experiment clean
 
@@ -18,13 +19,13 @@ test:
 	@python3 -m unittest discover -s tests -v
 
 serve:
-	@python3 -m src.server --port $(PORT)
+	@python3 -m src.server --port $(PORT) --table-type $(TABLE)
 
 experiment:
-	@python3 experiments/probe_experiment.py
+	@python3 -m experiments.probe_experiment
 
 compare-experiment:
-	@python3 experiments/compare_tables.py
+	@python3 -m experiments.compare_tables
 
 clean:
 	rm -rf src/__pycache__ tests/__pycache__ experiments/__pycache__
