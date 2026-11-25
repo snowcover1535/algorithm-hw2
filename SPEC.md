@@ -27,9 +27,14 @@ for chaining experiments. String keys use the polynomial accumulator
 `h = (h * 31 + ord(char)) % capacity`. The implementation must not use Python
 `dict`, `set`, or built-in `hash()`.
 
-`set(key, value)` inserts or replaces; `get(key)` returns a value or raises
-`KeyError`; `contains(key)` returns a boolean; `delete(key)` returns the removed
-value or raises `KeyError`; and `len(table)` returns the number of entries.
+`put(key, value)` inserts or replaces an entry. `get(key)` returns the value or
+raises `KeyError` if the key is missing. `find(key)` returns a pair with the value
+(or `None` on a miss) and the number of compared nodes or inspected slots.
+Linear probing counts the first empty slot when a miss stops there. Use
+`key in table` for membership, `len(table)` for the number of entries, and
+`table.load_factor` for the ratio of entries to capacity.
+The `set` and `contains` methods also support insertion and membership checks.
+`delete(key)` returns the removed value or raises `KeyError`.
 Non-string keys raise `TypeError`.
 
 `src/linear_probing.py` provides `LinearProbingHashTable` with the same mapping

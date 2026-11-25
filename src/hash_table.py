@@ -53,13 +53,15 @@ class HashTable(Generic[Value]):
         trace = self.hash_trace(key, capacity)
         return trace[-1][1] if trace else 0
 
-    def _find_node(self, key: str) -> _Node[Value] | None:
+    def _find_node(self, key: str) -> tuple[_Node[Value] | None, int]:
         node = self._buckets[self.hash_index(key)]
+        compared = 0
         while node is not None:
+            compared += 1
             if node.key == key:
-                return node
+                return node, compared
             node = node.next
-        return None
+        return None, compared
 
     def set(self, key: str, value: Value) -> None:
         self._validate_key(key)
@@ -80,19 +82,33 @@ class HashTable(Generic[Value]):
                 node = node.next
             node.next = new_node
         self._size += 1
-        if self._max_load is not None and self._size / self.capacity > self._max_load:
+        if self._max_load is not None and self.load_factor > self._max_load:
             self._resize(self.capacity * 2)
 
+    def put(self, key: str, value: Value) -> None:
+        self.set(key, value)
+
+    def find(self, key: str) -> tuple[Value | None, int]:
+        """Return the value or None and the number of nodes compared."""
+        node, compared = self._find_node(key)
+        return (node.value if node is not None else None), compared
+
     def get(self, key: str) -> Value:
-        self._validate_key(key)
-        node = self._find_node(key)
+        node, _ = self._find_node(key)
         if node is None:
             raise KeyError(key)
         return node.value
 
     def contains(self, key: str) -> bool:
-        self._validate_key(key)
-        return self._find_node(key) is not None
+        node, _ = self._find_node(key)
+        return node is not None
+
+    def __contains__(self, key: str) -> bool:
+        return self.contains(key)
+
+    @property
+    def load_factor(self) -> float:
+        return self._size / self.capacity
 
     def delete(self, key: str) -> Value:
         self._validate_key(key)
