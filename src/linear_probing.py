@@ -38,16 +38,16 @@ class LinearProbingHashTable(Generic[Value]):
         trace = self.hash_trace(key, capacity)
         return trace[-1][1] if trace else 0
 
-    def _find_index(self, key: str) -> int | None:
+    def _find_index(self, key: str) -> tuple[int | None, int]:
         start = self.hash_index(key)
         for offset in range(self.capacity):
             index = (start + offset) % self.capacity
             entry = self._slots[index]
             if entry is None:
-                return None
+                return None, offset + 1
             if entry is not _TOMBSTONE and entry[0] == key:
-                return index
-        return None
+                return index, offset + 1
+        return None, self.capacity
 
     def set(self, key: str, value: Value) -> None:
         self._validate_key(key)
@@ -77,21 +77,34 @@ class LinearProbingHashTable(Generic[Value]):
         self._resize(self.capacity * 2)
         self.set(key, value)
 
+    def put(self, key: str, value: Value) -> None:
+        self.set(key, value)
+
+    def find(self, key: str) -> tuple[Value | None, int]:
+        """Return the value or None and the number of slots inspected."""
+        index, inspected = self._find_index(key)
+        return (self._slots[index][1] if index is not None else None), inspected
+
     def get(self, key: str) -> Value:
-        self._validate_key(key)
-        index = self._find_index(key)
+        index, _ = self._find_index(key)
         if index is None:
             raise KeyError(key)
         entry = self._slots[index]
         return entry[1]
 
     def contains(self, key: str) -> bool:
-        self._validate_key(key)
-        return self._find_index(key) is not None
+        index, _ = self._find_index(key)
+        return index is not None
+
+    def __contains__(self, key: str) -> bool:
+        return self.contains(key)
+
+    @property
+    def load_factor(self) -> float:
+        return self._size / self.capacity
 
     def delete(self, key: str) -> Value:
-        self._validate_key(key)
-        index = self._find_index(key)
+        index, _ = self._find_index(key)
         if index is None:
             raise KeyError(key)
         entry = self._slots[index]

@@ -7,6 +7,27 @@ from src.linear_probing import LinearProbingHashTable
 class HashTableContractTests:
     table_class = None
 
+    def test_course_mapping_interface_and_probe_counts(self):
+        table = self.table_class(capacity=8)
+        self.assertEqual(table.load_factor, 0)
+        self.assertNotIn("a", table)
+        table.put("a", None)
+        table.put("i", 2)
+        self.assertIn("a", table)
+        self.assertEqual(table.find("a"), (None, 1))
+        self.assertEqual(table.find("i"), (2, 2))
+        self.assertEqual(table.find("q"), (None, len(table.lookup_trace("q"))))
+        self.assertNotIn("q", table)
+        self.assertEqual(table.load_factor, 0.25)
+
+        table.put("i", 20)
+        self.assertEqual(table.get("i"), 20)
+        self.assertEqual(len(table), 2)
+        self.assertIsNone(table.delete("a"))
+        self.assertNotIn("a", table)
+        self.assertEqual(table.find("i"), (20, len(table.lookup_trace("i"))))
+        self.assertEqual(table.load_factor, 0.125)
+
     def test_empty_table_and_missing_key(self):
         table = self.table_class()
         self.assertEqual(len(table), 0)
@@ -65,6 +86,8 @@ class LinearProbingHashTableTests(unittest.TestCase, HashTableContractTests):
         self.assertEqual(slots[7], [("g", "last")])
         self.assertEqual(slots[0], [("o", "wrapped")])
         self.assertEqual(table.lookup_trace("o"), [7, 0])
+        self.assertEqual(table.find("o"), ("wrapped", 2))
+        self.assertEqual(table.find("w"), (None, 3))
 
     def test_full_table_is_searchable_and_grows_for_next_entry(self):
         table = LinearProbingHashTable(capacity=4)
@@ -72,6 +95,8 @@ class LinearProbingHashTableTests(unittest.TestCase, HashTableContractTests):
             table.set(f"full-{index}", index)
         self.assertEqual(table.capacity, 4)
         self.assertEqual(len(table), 4)
+        self.assertEqual(table.find("missing"), (None, 4))
+        self.assertEqual(table.load_factor, 1)
         for index in range(4):
             self.assertEqual(table.get(f"full-{index}"), index)
 
